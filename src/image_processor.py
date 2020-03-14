@@ -3,13 +3,36 @@ from tkinter import colorchooser
 from tkinter.filedialog import askopenfilename, asksaveasfilename
 
 # internal module
-from image_operator import resize_image, load_image, save_image, image_to_uint8, treshold_high_image, treshold_low_image
+from image_operator import resize_image, load_image, save_image, image_to_uint8, treshold_high_image, treshold_low_image, rgb_image
 from utils.tkinter_helper import create_button, create_label, create_slider
 
 # Plots
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import numpy as np
+
+def simple_logger(func):
+    def wrapper(*args, **kwargs):
+        print(f'Calling {func.__name__}')
+
+        func(*args, **kwargs)
+
+        print(f'{func.__name__} done!')
+    return wrapper
+
+def process_image(func):
+    def wrapper(*args, **kwargs):
+        # args[0] - self
+        if args[0].image.size <= 0:
+            print('Cannot process empty image')
+            return
+            
+        print(f'Processing {func.__name__}')
+
+        func(*args, **kwargs)
+
+        print('Proceed!')
+    return wrapper
 
 class Application(tk.Frame):
 
@@ -20,6 +43,11 @@ class Application(tk.Frame):
     height = 1080
     background_color = '#110754'
     image = np.zeros(0)
+    filetypes = (
+        ('JPEG', ('*.jpg','*.jpeg','*.jpe','*.jfif')),
+        ('PNG', '*.png'),
+        ('BMP', ('*.bmp','*.jdib')),
+        ('GIF', '*.gif'))
 
     def __init__(self, master=None):
         super().__init__(master)
@@ -80,41 +108,28 @@ class Application(tk.Frame):
         self.plot_canvas.draw()
         self.plot_canvas.get_tk_widget().pack(side=tk.TOP, expand=True)
 
-    def is_image_null(self):
-        if (self.image.size <= 0):
-            print('Image is null')
-            return True
-        return False
-
+    @process_image
     def apply_high_treshold(self):
-        if self.is_image_null():
-            print('Cannnot apply treshold on null image')
-            return
-
         self.image = treshold_high_image(image=self.image, treshold=self.treshold_slider.get() / 255)
         self.show_plot()
 
+    @process_image
     def apply_low_treshold(self):
-        if self.is_image_null():
-            print('Cannnot apply treshold on null image')
-            return
-        
         self.image = treshold_low_image(image=self.image, treshold=self.treshold_slider.get()/ 255)
         self.show_plot()
 
+    @process_image
     def apply_rgb(self):
-        if self.is_image_null():
-            print('Cannot rgb image. Image is null')
-            return
+        image = resize_image(self.image, self.width, self.height)
+        self.image = rgb_image(image, self.rgb_multiplier)
+        self.show_plot()
 
-        print('Processing RGB image...')
-
-        img_in = self.image
-        img_tinted = img_in
-        img_tinted = img_in * self.rgb_multiplier
-        img_tinted = resize_image(img_tinted, self.width, self.height)
-
-        self.image = img_tinted
+    @process_image
+    def scale_image(self):
+        print('Resizing image')
+        self.width = self.width_slider.get()
+        self.height = self.height_slider.get()
+        self.image = resize_image(self.image, self.width, self.height)
         self.show_plot()
 
     def show_plot(self):
@@ -124,6 +139,7 @@ class Application(tk.Frame):
         self.ax.imshow(plot_image)
         self.plot_canvas.draw()
 
+    @simple_logger
     def create_color_picker(self):
         color = colorchooser.askcolor(title='select color')
         try:
@@ -135,28 +151,13 @@ class Application(tk.Frame):
             pass
         self.update_rgb_multiplier_text()
 
+    @simple_logger
     def update_rgb_multiplier_text(self):
         self.rgb_multiplier_text['text'] = f'RGB {self.rgb_multiplier}'
 
-    def scale_image(self):
-        if self.is_image_null():
-            print('Cannot scale image. Image is null')
-            return
-
-        print('Resizing image')
-        self.width = self.width_slider.get()
-        self.height = self.height_slider.get()
-        self.image = resize_image(self.image, self.width, self.height)
-        self.show_plot()
-
+    @simple_logger
     def open_file(self):
-        file_name = askopenfilename(title = "Open file",
-                                    filetypes = (
-                                        ('JPEG', ('*.jpg','*.jpeg','*.jpe','*.jfif')),
-                                        ('PNG', '*.png'),
-                                        ('BMP', ('*.bmp','*.jdib')),
-                                        ('GIF', '*.gif')
-                                    ))
+        file_name = askopenfilename(title = "Open file", filetypes=self.filetypes)
 
         if file_name is None or file_name == '':
             print('File not loaded. User probably canceled dialog')
@@ -167,15 +168,10 @@ class Application(tk.Frame):
 
         self.show_plot()
 
+    @simple_logger
     def save_file(self):
         print('Asking user to save file...')
-        file_name = asksaveasfilename(title = "Save file",
-                                    defaultextension='.jpg',
-                                    filetypes = (
-                                        ('JPEG', ('*.jpg','*.jpeg','*.jpe','*.jfif')),
-                                        ('PNG', '*.png'),
-                                        ('BMP', ('*.bmp','*.jdib')),
-                                        ('GIF', '*.gif')))
+        file_name = asksaveasfilename(title = "Save file", defaultextension='.jpg', filetypes=self.filetypes)
 
         if file_name is None or file_name == '':
             print('File was not selected. User probably canceled dialog')
