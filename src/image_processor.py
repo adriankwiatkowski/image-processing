@@ -3,7 +3,7 @@ from tkinter import colorchooser
 from tkinter.filedialog import askopenfilename, asksaveasfilename
 
 # internal module
-from image_operations import resize_image, load_image, save_image, show_image_plot, image_to_uint8
+from image_operator import resize_image, load_image, save_image, show_image_plot, image_to_uint8
 
 # Plots
 import matplotlib.pyplot as plt
